@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 
 //user routes
 import userRoutes from "./routes/user.route.js";
@@ -18,6 +19,8 @@ app.use(
       allowedHeaders: ["Content-Type", "Authorization"],
     })
   );
+
+app.use(cookieParser())
 
   app.use("/api/v1/user", userRoutes)
 
