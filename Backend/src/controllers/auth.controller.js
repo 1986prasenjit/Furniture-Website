@@ -2,7 +2,22 @@ import { User } from "../models/user.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import { ApiError } from "../utils/apiError.js";
-import bcrypt from "bcryptjs";
+
+const generateAccessAndRefreshToken = async function (userId) {
+  try {
+    const user = await User.findById(userId);
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+
+    return { accessToken, refreshToken }
+
+  } catch (error) {
+    throw new ApiError(500, "Something went wrong while generating accessToken and refreshToken")
+  }
+}
 
 const registerUser = asyncHandler(async (req, res) => {
   const { name, email, password } = req.body;
@@ -46,10 +61,12 @@ const registerUser = asyncHandler(async (req, res) => {
 
 const loginUser = asyncHandler(async (req, res) => {
   //get the data from req.body
-  const { email, password } = req.body;
+  const { email, password, name } = req.body;
 
   //validate the data in the database
-  const user = await User.findOne({ email });
+  const user = await User.findOne(
+    { $or: [{ email }, { name }] }
+  );
   if (!user) {
     return res
       .status(401)
@@ -80,44 +97,92 @@ const loginUser = asyncHandler(async (req, res) => {
       )
   }
   //generate the accessToken andrefreshToken
-  const accessToken = user.generateAccessToken();
-  const refreshToken = user.generateRefreshToken();
+  const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user._id);
 
   //Save refresh token in DB
-  user.refreshToken = refreshToken;
-  await user.save({ validateBeforeSave:false });
+  const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
 
   //cookie Options
   const cookieOptions = {
-    httpOnly:true,
+    httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   }
 
-  //Send refresh token in HttpOnly cookie
-  res.cookie("refreshToken", refreshToken, cookieOptions);
-
-  //customising user response
-  const userResponse = {
-    _id: user._id,
-    name: user.name,
-    email: user.email,
-    avatar: user.avatar,
-    isEmailverified: user.isEmailverified,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt
-  }; 
-
-
   //send the success response
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      { user: userResponse, accessToken },
-      "Login successful"
-    )
-  );
+  return res
+    .status(200)
+    .cookie("refreshToken", refreshToken, cookieOptions)
+    .cookie("accessToken", accessToken, cookieOptions)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          user: loggedInUser,
+          refreshToken,
+          accessToken
+        },
+        "User Logged In Successful"
+      )
+    );
 })
 
-export { registerUser, loginUser };
+const getProfile = asyncHandler(async (req, res) => {
+  const userID = req.user;
+
+  if (!userID) {
+    return res
+      .status(401)
+      .json(
+        new ApiError(
+          401,
+          "Request Profile Not Found",
+          [
+            { field: userID, message: "Invalid User Credencials" }
+          ]
+        )
+      )
+  }
+
+  const user = await User.findById(userID).select("-password -refreshToken");
+
+  if (!user) {
+    return res
+      .status(401)
+      .json(
+        new ApiError(401, "Request User Not Found",))
+  }
+
+  return res.status(200).json(
+    new ApiResponse(200, user, "User Fetched Successfully")
+  )
+})
+
+const logOutUser = asyncHandler(async (req, res) => {
+  const loggedOut = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        refreshToken: undefined,
+      }
+    }
+  )
+  console.log("loggedOutInfo",loggedOut);
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  }
+
+  return res
+    .status(200)
+    .clearCookie("refreshToken",cookieOptions)
+    .clearCookie("accessToken",cookieOptions)
+    .json(
+      new ApiResponse(200, {}, "User Logged Out Successfully")
+    )
+})
+
+export { registerUser, loginUser, getProfile, logOutUser };
