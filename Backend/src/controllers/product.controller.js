@@ -1,5 +1,6 @@
 import { Product } from "../models/product.model.js";
 import { ApiError } from "../utils/apiError.js";
+import APIFunctionalities from "../utils/apiFunctionalities.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
@@ -55,7 +56,11 @@ const createProduct = asyncHandler(async (req, res, next) => {
 });
 
 const getAllProduct = asyncHandler(async (req, res, next) => {
-  const allProduct = await Product.find();
+  const apiFunctionalities = new APIFunctionalities(Product.find(), req.query)
+    .search()
+    .filter();
+
+  const allProduct = await apiFunctionalities.query;
 
   if (!allProduct) {
     return next(new ApiError(500, "Failed to Fetch the Products"));
