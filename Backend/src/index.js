@@ -8,6 +8,13 @@ dotenv.config({
 
 const PORT = process.env.PORT || 8000;
 
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception! Shutting down...");
+  console.error(err.name, err.message);
+  process.exit(1);
+});
+
+//console.log(myName);
 connectDB()
   .then(() => {
     app.listen(PORT);
