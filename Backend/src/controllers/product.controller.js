@@ -56,9 +56,11 @@ const createProduct = asyncHandler(async (req, res, next) => {
 });
 
 const getAllProduct = asyncHandler(async (req, res, next) => {
+  const resultPerPage = 3;
   const apiFunctionalities = new APIFunctionalities(Product.find(), req.query)
     .search()
-    .filter();
+    .filter()
+    .pagination(resultPerPage);
 
   const allProduct = await apiFunctionalities.query;
 
