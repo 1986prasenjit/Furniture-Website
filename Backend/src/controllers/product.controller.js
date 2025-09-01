@@ -57,21 +57,38 @@ const createProduct = asyncHandler(async (req, res, next) => {
 
 const getAllProduct = asyncHandler(async (req, res, next) => {
   const resultPerPage = 3;
-  const apiFunctionalities = new APIFunctionalities(Product.find(), req.query)
+  const apiFeatures = new APIFunctionalities(Product.find(), req.query)
     .search()
-    .filter()
-    .pagination(resultPerPage);
+    .filter();
 
-  const allProduct = await apiFunctionalities.query;
+  //Getting filtered query before pagination
+  const filteredQuery = apiFeatures.query.clone();
+  const productCount = await filteredQuery.countDocuments();
 
-  if (!allProduct) {
-    return next(new ApiError(500, "Failed to Fetch the Products"));
+  //calculated totap pages based on filtered products count
+  const totalPages = Math.ceil(productCount / resultPerPage);
+  const page = parseInt(req.query.page) || 1;
+
+  if (page > totalPages && productCount > 0) {
+    return next(new ApiError(404, "This page does not exist"));
+  }
+
+  //Applying pagination after counting the products
+  apiFeatures.pagination(resultPerPage);
+  const products = await apiFeatures.query;
+
+  if (!products || products.length === 0) {
+    return next(new ApiError(404, "Sorry, Requested Product not found"));
   }
 
   return res
     .status(200)
     .json(
-      new ApiResponse(200, allProduct, "All Products fetched successfully")
+      new ApiResponse(
+        200,
+        { products, productCount },
+        "All Products fetched successfully"
+      )
     );
 });
 
