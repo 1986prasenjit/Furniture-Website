@@ -1,51 +1,54 @@
-import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
+import mongoose, { Schema } from "mongoose";
 
-const userSchema = new Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true,
-    unique: true,
-    lowercase: true,
+const userSchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      unique: true,
+      lowercase: true,
+    },
+    email: {
+      type: String,
+      required: [true, "Email Field can not be empty"],
+      trim: true,
+      unique: true,
+      lowercase: true,
+    },
+    password: {
+      type: String,
+      required: [true, "Password Field can not be empty"],
+    },
+    avatar: {
+      type: String,
+      required: false,
+    },
+    isEmailverified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerificationToken: {
+      type: String,
+    },
+    emailVerificationExpiry: {
+      type: Date,
+    },
+    forgotPasswordToken: {
+      type: String,
+    },
+    forgotPasswordExpiry: {
+      type: Date,
+    },
+    refreshToken: {
+      type: String,
+    },
   },
-  email: {
-    type: String,
-    required: true,
-    trim: true,
-    unique: true,
-    lowercase: true,
-  },
-  password: {
-    type: String,
-    required: [true, "Password is required"],
-  },
-  avatar: {
-    type: String,
-    required: false,
-  },
-  isEmailverified: {
-    type: Boolean,
-    default: false,
-  },
-  emailVerificationToken: {
-    type: String,
-  },
-  emailVerificationExpiry: {
-    type: Date,
-  },
-  forgotPasswordToken: {
-    type: String,
-  },
-  forgotPasswordExpiry: {
-    type: Date,
-  },
-  refreshToken: {
-    type: String
-  }
-}, { timestamps: true });
+  { timestamps: true }
+);
 
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
@@ -54,42 +57,45 @@ userSchema.pre("save", async function (next) {
 });
 
 userSchema.methods.isPasswordCorrect = async function (password) {
-  return await bcrypt.compare(password, this.password)
+  return await bcrypt.compare(password, this.password);
 };
 
 userSchema.methods.generateAccessToken = function () {
   return jwt.sign(
     {
-      _id: this._id
+      _id: this._id,
     },
-      process.env.ACCESS_TOKEN_SECRET,
+    process.env.ACCESS_TOKEN_SECRET,
     {
       expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
     }
-  )
-}; 
+  );
+};
 
 userSchema.methods.generateRefreshToken = function () {
   return jwt.sign(
     {
-      _id: this._id
+      _id: this._id,
     },
-      process.env.REFRESH_TOKEN_SECRET,
+    process.env.REFRESH_TOKEN_SECRET,
     {
       expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
     }
-  )
-}
+  );
+};
 
-userSchema.methods.generateTemporyToken = function(){
-    const unHashedToken = crypto.randomBytes(20).toString("hex");
+userSchema.methods.generateTemporyToken = function () {
+  const unHashedToken = crypto.randomBytes(20).toString("hex");
 
-    const hashedToken = crypto.createHash("sha256").update(unHashedToken).digest("hex");
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(unHashedToken)
+    .digest("hex");
 
-    const tokenExpiry = Date.now() + (20*60*1000);
+  const tokenExpiry = Date.now() + 20 * 60 * 1000;
 
-    return {hashedToken, unHashedToken, tokenExpiry}
-}
+  return { hashedToken, unHashedToken, tokenExpiry };
+};
 
 const User = mongoose.model("User", userSchema);
 
