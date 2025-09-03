@@ -23,6 +23,11 @@ const userSchema = new Schema(
       type: String,
       required: [true, "Password Field can not be empty"],
     },
+    role: {
+      type: String,
+      enum: ["User", "Admin"],
+      default: "User",
+    },
     avatar: {
       type: String,
       required: false,
