@@ -1,3 +1,5 @@
+import crypto from "crypto";
+import nodemailer from "nodemailer";
 import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/apiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
@@ -24,32 +26,79 @@ const generateAccessAndRefreshToken = async function (userId) {
 const registerUser = asyncHandler(async (req, res, next) => {
   const { name, email, password } = req.body;
 
-  const existingUser = await User.findOne({
-    email,
-  });
-
+  const existingUser = await User.findOne({ email });
   if (existingUser) {
     return next(
-      new ApiError(
-        409,
-        " Sorry, Authentication failed, Email-ID already exists"
-      )
+      new ApiError(409, "Sorry, Authentication failed, Email-ID already exists")
     );
   }
 
-  const newUser = await User.create({
-    name,
-    email,
-    password,
-  });
-
+  const newUser = await User.create({ name, email, password });
   if (!newUser) {
     return next(new ApiError(500, "Error while creating the User"));
   }
-  console.log(`Newly created User is: ${newUser}`);
+
+  const { hashedToken, unHashedToken, tokenExpiry } =
+    newUser.generateTemporyToken();
+
+  newUser.emailVerificationToken = hashedToken;
+  newUser.emailVerificationExpiry = tokenExpiry;
+  await newUser.save({ validateBeforeSave: false });
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.MAILTRAP_HOST,
+    port: process.env.MAILTRAP_PORT,
+    secure: false,
+    auth: {
+      user: process.env.MAILTRAP_USERNAME,
+      pass: process.env.MAILTRAP_PASSWORD,
+    },
+  });
+
+  const mailtrapOptions = {
+    from: process.env.MAILTRAP_SENDEREMAIL,
+    to: newUser.email,
+    subject: "Verify your Email",
+    text: `Please click on the following link: ${process.env.BASE_URL}/api/v1/user/verify-email/${unHashedToken}`,
+  };
+
+  await transporter.sendMail(mailtrapOptions);
+
   return res
     .status(201)
     .json(new ApiResponse(201, newUser, "User is Registered successfully"));
+});
+
+const verifyEmail = asyncHandler(async (req, res, next) => {
+  const { token } = req.params;
+  if (!token) {
+    return next(new ApiError(400, "Invalid or Missing Token"));
+  }
+
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+  const user = await User.findOne({
+    emailVerificationToken: hashedToken,
+    emailVerificationExpiry: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    return next(new ApiError(400, "Invalid or Expired Token"));
+  }
+
+  if (user.isEmailverified) {
+    return next(new ApiError(400, "Email is already verified"));
+  }
+
+  user.isEmailverified = true;
+  user.emailVerificationToken = undefined;
+  user.emailVerificationExpiry = undefined;
+
+  await user.save({ validateBeforeSave: false });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Email is verified successfully"));
 });
 
 const loginUser = asyncHandler(async (req, res, next) => {
@@ -149,4 +198,4 @@ const logOutUser = asyncHandler(async (req, res, next) => {
     .json(new ApiResponse(200, {}, "User Logged Out Successfully"));
 });
 
-export { getProfile, loginUser, logOutUser, registerUser };
+export { getProfile, loginUser, logOutUser, registerUser, verifyEmail };
