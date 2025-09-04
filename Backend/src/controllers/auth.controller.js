@@ -299,6 +299,38 @@ const resetPassword = asyncHandler(async (req, res, next) => {
     .status(200)
     .json(new ApiResponse(200, user, "Password has been reset successfully"));
 });
+
+const updatePassword = asyncHandler(async (req, res, next) => {
+  const { oldPassword, newPassword, confirmPassword } = req.body;
+
+  const { userId } = req.params;
+
+  const user = await User.findById(userId).select("+password");
+
+  if (!user) {
+    return next(new ApiError(404, "Invalid User credentials, user not found"));
+  }
+
+  const isPasswordMatched = await user.isPasswordCorrect(oldPassword);
+
+  if (!isPasswordMatched) {
+    return next(
+      new ApiError(400, "Sorry, old password you have provided is incorrect")
+    );
+  }
+
+  if (newPassword !== confirmPassword) {
+    return next(new ApiError(400, "Sorry, password doesn't match"));
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Your Password has been changed successfully"));
+});
+
 export {
   forgotPassword,
   getProfile,
@@ -306,5 +338,6 @@ export {
   logOutUser,
   registerUser,
   resetPassword,
+  updatePassword,
   verifyEmail,
 };

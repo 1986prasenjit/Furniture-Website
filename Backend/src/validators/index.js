@@ -46,6 +46,35 @@ const loginUserValidator = () => {
   ];
 };
 
+const updatePasswordValidator = () => {
+  return [
+    body("oldPassword")
+      .trim()
+      .notEmpty()
+      .withMessage("Password Field can not be empty")
+      .isLength({ min: 8, max: 15 })
+      .withMessage(
+        "Password should be at least of 8 Chars and should not exceed 15 chars"
+      ),
+    body("newPassword")
+      .trim()
+      .notEmpty()
+      .withMessage("Password Field can not be empty")
+      .isLength({ min: 8, max: 15 })
+      .withMessage(
+        "Password should be at least of 8 Chars and should not exceed 15 chars"
+      ),
+    body("confirmPassword")
+      .trim()
+      .notEmpty()
+      .withMessage("Password Field can not be empty")
+      .isLength({ min: 8, max: 15 })
+      .withMessage(
+        "Password should be at least of 8 Chars and should not exceed 15 chars"
+      ),
+  ];
+};
+
 const productValidator = () => {
   return [
     body("productName")
@@ -72,4 +101,9 @@ const productValidator = () => {
       .withMessage("Stock must be a non-negative integer"),
   ];
 };
-export { loginUserValidator, productValidator, userRegistrationValidator };
+export {
+  loginUserValidator,
+  productValidator,
+  updatePasswordValidator,
+  userRegistrationValidator,
+};

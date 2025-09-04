@@ -6,12 +6,14 @@ import {
   logOutUser,
   registerUser,
   resetPassword,
+  updatePassword,
   verifyEmail,
 } from "../controllers/auth.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { validate } from "../middlewares/validator.middleware.js";
 import {
   loginUserValidator,
+  updatePasswordValidator,
   userRegistrationValidator,
 } from "../validators/index.js";
 
@@ -23,6 +25,9 @@ router
 router.route("/verify-email/:token").get(verifyEmail);
 router.route("/forgot-password").post(forgotPassword);
 router.route("/reset-password/:token").post(resetPassword);
+router
+  .route("/update-password/:userId")
+  .post(updatePasswordValidator(), validate, verifyJWT, updatePassword);
 router.route("/login").post(loginUserValidator(), validate, loginUser);
 router.route("/logout").get(verifyJWT, logOutUser);
 router.route("/profile").get(verifyJWT, getProfile);
