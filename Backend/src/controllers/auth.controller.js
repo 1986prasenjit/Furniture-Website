@@ -59,7 +59,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
     from: process.env.MAILTRAP_SENDEREMAIL,
     to: newUser.email,
     subject: "Verify your Email",
-    text: `Please click on the following link: ${process.env.BASE_URL}/api/v1/user/verify-email/${unHashedToken}`,
+    text: `Please use the following link to verify your email : ${process.env.BASE_URL}/api/v1/user/verify-email/${unHashedToken}. \n\n This link will expire in 20 minutes.`,
   };
 
   await transporter.sendMail(mailtrapOptions);
@@ -198,4 +198,113 @@ const logOutUser = asyncHandler(async (req, res, next) => {
     .json(new ApiResponse(200, {}, "User Logged Out Successfully"));
 });
 
-export { getProfile, loginUser, logOutUser, registerUser, verifyEmail };
+const forgotPassword = asyncHandler(async (req, res, next) => {
+  const { email } = req.body;
+  if (!email) {
+    return next(new ApiError(400, "Email is requird to proceed"));
+  }
+
+  const requestedUser = await User.findOne({ email });
+
+  if (!requestedUser) {
+    return next(
+      new ApiError(404, "Sorry no user found with the requested Email-ID")
+    );
+  }
+
+  const { hashedToken, unHashedToken, tokenExpiry } =
+    requestedUser.generateTemporyToken();
+
+  requestedUser.forgotPasswordToken = hashedToken;
+  requestedUser.forgotPasswordExpiry = tokenExpiry;
+  await requestedUser.save({ validateBeforeSave: false });
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: process.env.MAILTRAP_HOST,
+      port: process.env.MAILTRAP_PORT,
+      secure: false,
+      auth: {
+        user: process.env.MAILTRAP_USERNAME,
+        pass: process.env.MAILTRAP_PASSWORD,
+      },
+    });
+
+    const mailtrapOptions = {
+      from: process.env.MAILTRAP_SENDEREMAIL,
+      to: requestedUser.email,
+      subject: "Reset Password Request",
+      text: `Please use the following link to reset your password : ${process.env.BASE_URL}/api/v1/user/reset-password/${unHashedToken}. \n\n This link will expire in 20 minutes. \n\n If you didn't requested to reset your password then please ignore this message`,
+    };
+    await transporter.sendMail(mailtrapOptions);
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          {},
+          `Email Sent Successfully to ${requestedUser.email} `
+        )
+      );
+  } catch (error) {
+    requestedUser.forgotPasswordToken = undefined;
+    requestedUser.forgotPasswordExpiry = undefined;
+    await requestedUser.save({ validateBeforeSave: false });
+
+    return next(
+      new ApiError(500, "Something went wrong while sending the email")
+    );
+  }
+});
+
+const resetPassword = asyncHandler(async (req, res, next) => {
+  const { token } = req.params;
+  const { password, confirmPassword } = req.body;
+
+  if (!token) {
+    return next(
+      new ApiError(400, "Sorry, the Token is either Invalid or expired")
+    );
+  }
+
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+  const user = await User.findOne({
+    forgotPasswordToken: hashedToken,
+    forgotPasswordExpiry: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    return next(
+      new ApiError(
+        400,
+        "Sorry, user not found, the Token is either Invalid or expired"
+      )
+    );
+  }
+
+  if (password !== confirmPassword) {
+    return next(
+      new ApiError(400, "Password and Confirm Password should be same")
+    );
+  }
+
+  user.password = password;
+  user.forgotPasswordToken = undefined;
+  user.forgotPasswordExpiry = undefined;
+  await user.save();
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Password has been reset successfully"));
+});
+export {
+  forgotPassword,
+  getProfile,
+  loginUser,
+  logOutUser,
+  registerUser,
+  resetPassword,
+  verifyEmail,
+};
