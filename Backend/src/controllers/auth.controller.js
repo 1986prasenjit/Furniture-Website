@@ -331,6 +331,75 @@ const updatePassword = asyncHandler(async (req, res, next) => {
     .json(new ApiResponse(200, "Your Password has been changed successfully"));
 });
 
+const updateProfile = asyncHandler(async (req, res, next) => {
+  const { name, email } = req.body;
+
+  const updatedValues = {
+    name,
+    email,
+  };
+
+  const user = await User.findByIdAndUpdate(req.user.id, updatedValues, {
+    new: true,
+    runValidators: true,
+  });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Profile has been updated successfully"));
+});
+
+const updateAccessToken = asyncHandler(async (req, res, next) => {
+  const { refreshToken } = req.cookies;
+
+  if (!refreshToken) {
+    return next(new ApiError(400, "Invalid Refresh Token or Expired Token"));
+  }
+
+  const decodedToken = await jwt.verify(
+    refreshToken,
+    process.env.REFRESH_TOKEN_SECRET
+  );
+
+  const user = await User.findById(decodedToken.id);
+
+  if (!user) {
+    return next(new ApiError(404, "Invalid User Credentials"));
+  }
+
+  const isRefreshTokenValid = await user.isRefreshTokenValid(refreshToken);
+  if (!isRefreshTokenValid) {
+    return next(new ApiError(401, "Invalid User Credentials"));
+  }
+
+  const { newAccessToken } = user.generateNewAccessToken();
+
+  const { newRefreshToken } = user.generateNewRefreshToken();
+  user.refreshToken = newRefreshToken;
+  await user.save();
+
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
+
+  return res
+    .status(200)
+    .cookie("accessToken", newAccessToken, cookieOptions)
+    .cookie("refreshToken", newRefreshToken, cookieOptions)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          newAccessToken,
+          newRefreshToken,
+        },
+        "Tokens Refreshed Successfully"
+      )
+    );
+});
 export {
   forgotPassword,
   getProfile,
@@ -338,6 +407,8 @@ export {
   logOutUser,
   registerUser,
   resetPassword,
+  updateAccessToken,
   updatePassword,
+  updateProfile,
   verifyEmail,
 };

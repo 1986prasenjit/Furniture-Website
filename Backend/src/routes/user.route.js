@@ -6,7 +6,9 @@ import {
   logOutUser,
   registerUser,
   resetPassword,
+  updateAccessToken,
   updatePassword,
+  updateProfile,
   verifyEmail,
 } from "../controllers/auth.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
@@ -22,13 +24,18 @@ const router = Router();
 router
   .route("/register")
   .post(userRegistrationValidator(), validate, registerUser);
+
 router.route("/verify-email/:token").get(verifyEmail);
 router.route("/forgot-password").post(forgotPassword);
 router.route("/reset-password/:token").post(resetPassword);
+
 router
   .route("/update-password/:userId")
   .post(updatePasswordValidator(), validate, verifyJWT, updatePassword);
+
 router.route("/login").post(loginUserValidator(), validate, loginUser);
 router.route("/logout").get(verifyJWT, logOutUser);
 router.route("/profile").get(verifyJWT, getProfile);
+router.route("/update/profile").post(verifyJWT, updateProfile);
+router.route("/update/refresh-token").post(verifyJWT, updateAccessToken);
 export default router;
