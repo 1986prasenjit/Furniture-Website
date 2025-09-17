@@ -400,9 +400,92 @@ const updateAccessToken = asyncHandler(async (req, res, next) => {
       )
     );
 });
+
+//Admin controller to get all the user details
+
+const getAllUsersLists = asyncHandler(async (req, res, next) => {
+  const allUser = await User.find().select("-password -refreshToken");
+
+  if (!allUser) {
+    return next(
+      new ApiError(
+        404,
+        "Sorry can't get user at this moment, please try after sometime",
+        []
+      )
+    );
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, allUser, "All user fetched Successfully"));
+});
+
+const getSingleUser = asyncHandler(async (req, res, next) => {
+  const { userId } = req.params;
+  const user = await User.findById(userId).select("-password -refreshToken");
+
+  if (!user) {
+    return next(
+      new ApiError(
+        404,
+        "Sorry no user found with the particular ID, please try after sometime",
+        []
+      )
+    );
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "User details fetched Successfully"));
+});
+
+const updateUserRole = asyncHandler(async (req, res, next) => {
+  const { userId } = req.params;
+
+  if (!userId) {
+    return next(new ApiError(400, "Sorry invalid user id, Please check it"));
+  }
+  const { role } = req.body;
+  const newRole = {
+    role,
+  };
+  const user = await User.findByIdAndUpdate(userId, newRole, {
+    new: true,
+    runValidators: true,
+  });
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, user, "Requested user role is updated successfully")
+    );
+});
+
+const deleteUser = asyncHandler(async (req, res, next) => {
+  const { userId } = req.params;
+
+  if (!userId) {
+    return next(new ApiError(400, "Sorry invalid user id, Please check it"));
+  }
+
+  const user = await User.findByIdAndDelete(userId);
+
+  if (!user) {
+    return next(new ApiError(404, "Sorry, no user found with the ID"));
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "User deleted successfully"));
+});
+
 export {
+  deleteUser,
   forgotPassword,
+  getAllUsersLists,
   getProfile,
+  getSingleUser,
   loginUser,
   logOutUser,
   registerUser,
@@ -410,5 +493,6 @@ export {
   updateAccessToken,
   updatePassword,
   updateProfile,
+  updateUserRole,
   verifyEmail,
 };

@@ -167,10 +167,24 @@ const deleteProduct = asyncHandler(async (req, res, next) => {
     );
 });
 
+//Admin Controller for getting all the products
+const getAllProductForAdmin = asyncHandler(async (req, res, next) => {
+  const products = await Product.find().sort({ createdAt: -1 });
+
+  if (!products || products.length === 0) {
+    return next(new ApiError(404, "No products found"));
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, products, "All products fetched Successfully"));
+});
+
 export {
   createProduct,
   deleteProduct,
   getAllProduct,
+  getAllProductForAdmin,
   getProductByID,
   updateProduct,
 };
